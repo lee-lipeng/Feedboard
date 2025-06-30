@@ -22,9 +22,9 @@ def create_access_token(subject: Union[str, Any], expires_delta: Optional[timede
     根据给定的主题（通常是用户ID）和过期时间创建一个新的JWT访问令牌。
     """
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -60,11 +60,11 @@ async def get_current_user_from_token(token: str) -> Optional[User]:
     if user is None:
         logger.warning(f"认证失败：未找到令牌中ID为 {user_id} 的用户。")
         return None
-    
+
     if not user.is_active:
         logger.warning(f"认证失败：用户 {user.email} 处于非活动状态。")
         return None
-        
+
     return user
 
 
@@ -81,14 +81,3 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
-
-
-async def get_current_active_superuser(current_user: User = Depends(get_current_user)) -> User:
-    """
-    一个FastAPI依赖项，用于验证当前用户是否为超级用户。
-    如果不是，则抛出403 Forbidden异常。
-    """
-    if not current_user.is_superuser:
-        logger.warning(f"权限不足：非管理员用户 '{current_user.email}' 尝试访问管理员接口。")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="此操作需要管理员权限。")
-    return current_user

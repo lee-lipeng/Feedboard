@@ -32,12 +32,12 @@ class Settings(BaseSettings):
 
     # CORS配置
     CORS_ORIGINS: List[str] = [
-    "http://localhost",
-    "http://localhost:5173",  # Vue 开发服务器默认端口
-    "http://127.0.0.1:5173",
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-]
+        "http://localhost",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 
     # 数据库配置
     # 数据库类型: "postgres" 或 "sqlite"
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
 
     # ORM配置
-    DB_MODELS: List[str] = ["models.user", "models.feed", "models.article"]
+    DB_MODELS: List[str] = ["models", "aerich.models"]
     GENERATE_SCHEMAS: bool = True
 
     class Config:

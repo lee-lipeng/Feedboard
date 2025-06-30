@@ -1,7 +1,8 @@
-from fastapi import Request, status
+from fastapi import Request, status, FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError, HTTPException
 from loguru import logger
+
 
 async def http_exception_handler(request: Request, exc: HTTPException):
     """
@@ -25,7 +26,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     # 记录详细的验证错误信息，方便后端调试
     logger.warning(
-        f"Request validation failed for {request.method} {request.url.path}: {exc.errors()}"
+        f"请求参数验证失败 {request.method} {request.url.path}: {exc.errors()}"
     )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -40,10 +41,25 @@ async def generic_exception_handler(request: Request, exc: Exception):
     """
     # 使用 logger.exception 可以自动捕获并记录完整的异常堆栈信息
     logger.exception(
-        f"Unhandled internal server error caught for request "
+        f"服务器异常 "
         f"{request.method} {request.url.path}"
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "服务器内部发生了一个未知错误，我们已经记录了该问题。"},
-    ) 
+        content={"detail": "服务器异常"},
+    )
+
+
+def setup_exception_handlers(app: FastAPI) -> None:
+    """
+    设置异常处理器
+
+    为FastAPI应用添加全局异常处理器。
+
+    Args:
+        app: FastAPI应用实例
+    """
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, generic_exception_handler)
+    logger.info("异常处理器设置完成")

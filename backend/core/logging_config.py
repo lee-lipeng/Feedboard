@@ -35,5 +35,5 @@ def setup_logging():
     #     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}"
     # )
     
-    logger.info("Loguru logging has been successfully configured.")
+    logger.info("Loguru日志记录已成功配置.")
 
