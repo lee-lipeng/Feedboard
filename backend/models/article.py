@@ -34,8 +34,8 @@ class UserArticle(models.Model):
     这是一个多对多关系的中间表。
     """
     id = fields.IntField(pk=True)
-    user = fields.ForeignKeyField("models.User", related_name="article_interactions", description="关联的用户")
-    article = fields.ForeignKeyField("models.Article", related_name="user_interactions", description="关联的文章")
+    user = fields.ForeignKeyField("models.User", related_name="article_interactions", on_delete=fields.CASCADE, description="关联的用户")
+    article = fields.ForeignKeyField("models.Article", related_name="user_interactions", on_delete=fields.CASCADE, description="关联的文章")
     
     # 交互状态字段
     is_read = fields.BooleanField(default=False, index=True, description="是否已读")

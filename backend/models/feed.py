@@ -2,7 +2,6 @@ from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
 from enum import Enum
 
-
 from .article import Article
 
 
@@ -45,8 +44,8 @@ class Feed(models.Model):
 class UserFeed(models.Model):
     """用户订阅表 - 存储用户与Feed的订阅关系及个性化设置"""
     id = fields.IntField(pk=True, description="用户订阅ID")
-    user = fields.ForeignKeyField("models.User", related_name="feed_subscriptions", description="用户")
-    feed = fields.ForeignKeyField("models.Feed", related_name="user_subscriptions", description="订阅源")
+    user = fields.ForeignKeyField("models.User", related_name="feed_subscriptions", on_delete=fields.CASCADE, description="关联的用户")
+    feed = fields.ForeignKeyField("models.Feed", related_name="user_subscriptions", on_delete=fields.CASCADE, description="关联的订阅源")
     title_override = fields.CharField(max_length=255, null=True, description="用户自定义标题")
     category = fields.CharEnumField(FeedCategory, default=FeedCategory.OTHER, description="用户自定义分类")
     created_at = fields.DatetimeField(auto_now_add=True, description="记录创建时间")

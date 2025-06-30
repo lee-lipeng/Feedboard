@@ -65,3 +65,15 @@ async def update_current_user_info(
     logger.info(f"用户个人资料 {current_user.email} 已成功更新.")
 
     return await User_Pydantic.from_tortoise_orm(current_user)
+
+
+@router.delete("/me", summary="注销当前用户")
+async def delete_current_user(current_user: User = Depends(get_current_user)):
+    """
+    注销当前用户。
+
+    使用物理删除清除与用户相关的一切数据，包括用户的订阅，文章，偏好设置等。
+    """
+    await current_user.delete()
+    logger.info(f"用户 {current_user.email} 已成功注销.")
+    return {"message": "用户已成功注销"}
