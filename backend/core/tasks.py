@@ -194,7 +194,7 @@ class WorkerSettings:
     on_shutdown = shutdown
     cron_jobs = [
         cron(
-            'refresh_all_feeds_task',
+            refresh_all_feeds_task,
             minute={0, 30},  # 每30分钟执行
             run_at_startup=True  # 启动时立即执行一次
         )
