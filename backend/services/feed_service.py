@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from loguru import logger
 from tortoise.exceptions import DoesNotExist
+from tortoise.transactions import in_transaction
 
 from models.feed import Feed, UserFeed, FeedCategory
 from models.article import Article, UserArticle
@@ -20,7 +21,7 @@ async def parse_feed_from_url(url: str) -> Optional[dict]:
         包含解析后的源信息的字典，如果失败则返回None。
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
             response = await client.get(url)
             response.raise_for_status()
 
@@ -137,10 +138,15 @@ async def delete_feed(feed_id: int, user_id: int) -> bool:
         如果成功删除返回True，否则返回False。
     """
     try:
-        await UserFeed.filter(user_id=user_id, feed_id=feed_id).delete()
-        await UserArticle.filter(user_id=user_id, feed_id=feed_id).delete()
-        logger.success(f"成功为用户 {user_id} 取消订阅Feed ID: {feed_id}")
-        return True
+        async with in_transaction():
+            await UserFeed.filter(user_id=user_id, feed_id=feed_id).delete()
+            if article_ids_to_check := await Article.filter(feed_id=feed_id).values_list("id", flat=True):
+                await UserArticle.filter(
+                    user_id=user_id,
+                    article_id__in=article_ids_to_check
+                ).delete()
+            logger.success(f"成功为用户 {user_id} 取消订阅Feed ID: {feed_id}")
+            return True
     except DoesNotExist:
         logger.warning(f"取消订阅失败：用户 {user_id} 未订阅Feed ID {feed_id} 或该Feed不存在。")
         return False
