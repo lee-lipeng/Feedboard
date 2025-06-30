@@ -60,14 +60,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     处理连接认证、生命周期管理和消息收发。
     """
     conn_id = str(uuid.uuid4())
-    user: User = None
 
     # 将连接信息绑定到日志上下文
     with logger.contextualize(conn_id=conn_id):
         try:
             user = await get_current_user_from_token(token)
             if not user:
-                logger.warning("WebSocket connection attempt with invalid token.")
+                logger.warning("WebSocket连接失败，无效令牌.")
                 # 不调用 accept()，连接会自动被拒绝
                 return
 
@@ -85,14 +84,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
             # 保持连接并监听消息
             while True:
                 data = await websocket.receive_json()
-                logger.debug(f"Received data from client: {data}")
+                logger.debug(f"从客户端接收数据: {data}")
                 if data.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
 
         except WebSocketDisconnect:
             logger.info("WebSocket client disconnected.")
         except Exception as e:
-            logger.exception(f"An unexpected error occurred in WebSocket: {e}")
+            logger.exception(f"WebSocket中发生意外错误: {e}")
             # 尝试向客户端发送错误信息
             try:
                 await websocket.send_json(
@@ -103,7 +102,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                     }
                 )
             except (WebSocketDisconnect, RuntimeError):
-                logger.warning("Could not send error message to client, connection already closed.")
+                logger.warning("无法向客户端发送错误消息，连接已关闭.")
         finally:
             if user:
                 manager.disconnect(user.id, conn_id)

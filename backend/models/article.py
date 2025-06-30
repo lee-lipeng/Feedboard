@@ -62,11 +62,3 @@ Article_Pydantic = pydantic_model_creator(
 ArticleCreate_Pydantic = pydantic_model_creator(
     Article, name="ArticleCreate", exclude=("id", "created_at", "updated_at")
 )
-
-# 用户文章交互Pydantic模型
-UserArticle_Pydantic = pydantic_model_creator(
-    UserArticle, name="UserArticle"
-)
-UserArticleCreate_Pydantic = pydantic_model_creator(
-    UserArticle, name="UserArticleCreate", exclude=("id", "created_at", "updated_at")
-)

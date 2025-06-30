@@ -1,14 +1,13 @@
 from datetime import timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from loguru import logger
 
+from models.user import User_Pydantic
 from core.security import create_access_token
 from core.config import settings
 from services.user_service import authenticate_user, create_user, get_user_by_email
-from models.user import User_Pydantic
 
 router = APIRouter()
 
@@ -30,10 +29,9 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """
     使用 OAuth2 标准的密码流进行用户认证，成功后返回 JWT。
     """
-    logger.info(f"用户登录尝试: {form_data.username}")
     user = await authenticate_user(form_data.username, form_data.password)
     if not user:
-        logger.warning(f"用户登录尝试失败: {form_data.username}")
+        logger.warning(f"用户 {form_data.username} 登录失败, 邮箱或密码不正确.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="邮箱或密码不正确",
@@ -53,7 +51,6 @@ async def register_user(user_in: UserRegister) -> User_Pydantic:
     创建新用户。
     在创建前会检查邮箱是否已被占用。
     """
-    logger.info(f"尝试注册电子邮件： {user_in.email}")
     existing_user = await get_user_by_email(user_in.email)
     if existing_user:
         logger.warning(f"注册失败：电子邮件 {user_in.email} 已存在.")

@@ -53,14 +53,13 @@ async def update_user_preferences(
     """
     update_data = preferences.model_dump(exclude_unset=True)
     if not update_data:
+        logger.warning(f"没有提供任何需要更新的偏好设置 {current_user.email}")
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="没有提供任何需要更新的偏好设置")
-
-    logger.info(f"更新用户偏好 {current_user.email} 数据: {update_data}")
 
     for key, value in update_data.items():
         setattr(current_user, key, value)
 
     await current_user.save()
-    logger.info(f"用户的偏好设置已成功更新 {current_user.email}")
+    logger.info(f"用户的偏好设置已成功更新 {current_user.email} 数据: {update_data}")
 
     return UserPreferences.model_validate(current_user)

@@ -17,7 +17,6 @@ async def export_opml_data(current_user: User = Depends(get_current_user)):
     """
     将当前用户的所有订阅数据打包成一个标准的 OPML 2.0 文件供下载。
     """
-    logger.info(f"正在导出 OPML 文件，用户: {current_user.email}")
     user_feeds = await UserFeed.filter(user_id=current_user.id).prefetch_related('feed')
 
     opml = ET.Element('opml', version='2.0')

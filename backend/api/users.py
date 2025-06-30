@@ -40,8 +40,6 @@ async def update_current_user_info(
             detail="没有提供任何需要更新的信息"
         )
 
-    logger.info(f"正在更新用户个人资料: {current_user.email}")
-
     # 更新邮箱
     if user_in.email and user_in.email != current_user.email:
         existing_user = await User.filter(email=user_in.email).first()

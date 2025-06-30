@@ -13,9 +13,6 @@ from core.exception_handlers import setup_exception_handlers
 from core.logging_config import setup_logging
 from api import api_router
 
-# 在应用启动的最开始就配置好日志
-setup_logging()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -39,38 +36,43 @@ async def lifespan(app: FastAPI):
     await app.state.arq_pool.close()
 
 
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    description=settings.PROJECT_DESCRIPTION,
-    version=settings.PROJECT_VERSION,
-    lifespan=lifespan
-)
+def create_app() -> FastAPI:
+    setup_logging()
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        description=settings.PROJECT_DESCRIPTION,
+        version=settings.PROJECT_VERSION,
+        lifespan=lifespan
+    )
 
-# 设置CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
-)
+    # 设置CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Content-Disposition"],
+    )
 
-# 注册 Tortoise-ORM
-register_tortoise(
-    app,
-    config=TORTOISE_ORM,
-    generate_schemas=False,
-    add_exception_handlers=True,
-)
+    # 注册 Tortoise-ORM
+    register_tortoise(
+        app,
+        config=TORTOISE_ORM,
+        generate_schemas=False,
+        add_exception_handlers=True,
+    )
 
-# 设置异常处理器
-setup_exception_handlers(app)
+    # 设置异常处理器
+    setup_exception_handlers(app)
 
-# 注册路由
-app.include_router(api_router)
+    # 注册路由
+    app.include_router(api_router)
+
+    return app
+
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:create_app", host="0.0.0.0", port=8000, reload=True, factory=True)

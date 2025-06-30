@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, HttpUrl
 from arq.connections import ArqRedis
 from loguru import logger
+from datetime import datetime
 
 from models.user import User
-from models.feed import FeedCategory, FeedResponse, UserFeedResponse
+from models.feed import FeedCategory
 from core.security import get_current_user
 from services.feed_service import (
     get_user_feeds,
@@ -16,6 +17,36 @@ from services.feed_service import (
 )
 
 router = APIRouter()
+
+
+class FeedResponse(BaseModel):
+    """统一的Feed响应模型，前后端字段保持一致"""
+    feed_id: int
+    feed_title: str
+    feed_url: str
+    feed_description: Optional[str] = None
+    feed_website_url: Optional[str] = None
+    feed_image_url: Optional[str] = None
+    feed_last_fetched: Optional[datetime] = None
+    feed_category: FeedCategory = FeedCategory.OTHER
+    feed_created_at: datetime
+    feed_updated_at: datetime
+
+
+class UserFeedResponse(BaseModel):
+    """统一的UserFeed响应模型，包含用户特定信息"""
+    id: int
+    title_override: Optional[str] = None
+    category: FeedCategory
+    created_at: datetime
+    updated_at: datetime
+    feed_id: int
+    feed_title: str
+    feed_url: str
+    feed_description: Optional[str] = None
+    feed_website_url: Optional[str] = None
+    feed_image_url: Optional[str] = None
+    feed_last_fetched: Optional[datetime] = None
 
 
 class FeedCreate(BaseModel):
@@ -34,27 +65,28 @@ async def read_feeds(
     """
     获取当前认证用户的所有订阅源。
     """
-    logger.info(f"用户 {current_user.id} 请求订阅列表 (skip={skip}, limit={limit})")
     user_feeds = await get_user_feeds(current_user.id)
 
     # 手动构建包含完整Feed信息的响应模型列表
     result = []
     for user_feed in user_feeds[skip:skip + limit]:
         feed = user_feed.feed
-        result.append(UserFeedResponse(
-            id=user_feed.id,
-            title_override=user_feed.title_override,
-            category=user_feed.category,
-            created_at=user_feed.created_at,
-            updated_at=user_feed.updated_at,
-            feed_id=feed.id,
-            feed_title=feed.title,
-            feed_url=feed.url,
-            feed_description=feed.description,
-            feed_website_url=feed.website_url,
-            feed_image_url=feed.image_url,
-            feed_last_fetched=feed.last_fetched
-        ))
+        result.append(
+            UserFeedResponse(
+                id=user_feed.id,
+                title_override=user_feed.title_override,
+                category=user_feed.category,
+                created_at=user_feed.created_at,
+                updated_at=user_feed.updated_at,
+                feed_id=feed.id,
+                feed_title=feed.title,
+                feed_url=feed.url,
+                feed_description=feed.description,
+                feed_website_url=feed.website_url,
+                feed_image_url=feed.image_url,
+                feed_last_fetched=feed.last_fetched
+            )
+        )
 
     logger.success(f"成功为用户 {current_user.id} 返回 {len(result)} 个订阅源。")
     return result
@@ -70,7 +102,6 @@ async def add_feed_subscription(
     为当前用户添加一个新的Feed订阅。
     此操作是异步的：API会立即返回，并在后台通过arq任务处理Feed的抓取和解析。
     """
-    logger.info(f"用户 {current_user.id} 正在添加订阅: {feed_in.url}")
     try:
         # 该服务函数只处理快速的数据库操作（创建关系）
         feed = await create_feed(feed_in.model_dump(), current_user.id)
@@ -110,7 +141,6 @@ async def read_feed(
     """
     获取单个订阅源的详细信息。
     """
-    logger.info(f"用户 {current_user.id} 请求Feed详情, ID: {feed_id}")
     feed = await get_feed(feed_id, current_user.id)
     if not feed:
         logger.warning(f"用户 {current_user.id} 请求的Feed (ID: {feed_id}) 未找到或无权访问。")
@@ -118,9 +148,9 @@ async def read_feed(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="您未订阅此Feed，或该Feed不存在。"
         )
-    
+
     logger.success(f"成功返回Feed (ID: {feed_id}) 的详情给用户 {current_user.id}。")
-    return FeedResponse.from_orm(feed)
+    return FeedResponse.model_validate(feed)
 
 
 @router.delete("/{feed_id}", status_code=status.HTTP_200_OK)
@@ -131,7 +161,6 @@ async def remove_feed(
     """
     为当前用户取消订阅一个Feed源。
     """
-    logger.info(f"用户 {current_user.id} 请求取消订阅Feed, ID: {feed_id}")
     deleted = await delete_feed(feed_id, current_user.id)
     if not deleted:
         logger.warning(f"用户 {current_user.id} 取消订阅失败，因为未订阅Feed ID {feed_id}。")
@@ -167,7 +196,6 @@ async def refresh_feed(
     """
     为当前用户手动触发单个订阅源的后台刷新。
     """
-    logger.info(f"用户 {current_user.id} 请求刷新单个Feed, ID: {feed_id}")
     feed = await get_feed(feed_id, current_user.id)
     if not feed:
         logger.warning(f"用户 {current_user.id} 尝试刷新一个不存在或未订阅的Feed (ID: {feed_id})。")
@@ -179,6 +207,6 @@ async def refresh_feed(
     # 将刷新任务放入arq队列
     arq_pool: ArqRedis = request.app.state.arq_pool
     await arq_pool.enqueue_job("process_new_feed_task", feed_id=feed.id, user_id=current_user.id)
-    
+
     logger.success(f"已为Feed (ID: {feed.id}) 创建后台刷新任务。")
     return {"message": f"已触发 '{feed.title}' 的后台刷新"}

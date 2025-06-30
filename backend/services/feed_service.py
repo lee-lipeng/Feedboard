@@ -1,16 +1,12 @@
 import feedparser
+import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-import httpx
-import traceback
 from loguru import logger
-from tortoise.exceptions import DoesNotExist, IntegrityError
-from arq.connections import ArqRedis
+from tortoise.exceptions import DoesNotExist
 
 from models.feed import Feed, UserFeed, FeedCategory
 from models.article import Article, UserArticle
-from models.user import User
-from services.article_service import fetch_article_content
 
 
 async def parse_feed_from_url(url: str) -> Optional[dict]:
@@ -23,22 +19,21 @@ async def parse_feed_from_url(url: str) -> Optional[dict]:
     Returns:
         包含解析后的源信息的字典，如果失败则返回None。
     """
-    logger.info(f"开始从URL解析Feed: {url}")
     try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
             response = await client.get(url)
             response.raise_for_status()
-        
+
         feed_data = feedparser.parse(response.text)
-        
+
         if feed_data.bozo:
             logger.warning(f"解析Feed时遇到问题 (bozo=1): {url}, 异常: {feed_data.bozo_exception}")
-        
+
         feed_info = feed_data.get('feed', {})
         if not feed_info:
             logger.error(f"解析失败，无法从 {url} 中找到<feed>信息。")
             return None
-            
+
         logger.success(f"成功解析Feed: {url}")
         return feed_info
 
@@ -60,7 +55,6 @@ async def get_user_feeds(user_id: int) -> List[UserFeed]:
     Returns:
         一个包含用户订阅关系（UserFeed）对象的列表。
     """
-    logger.debug(f"正在为用户ID {user_id} 获取订阅列表")
     user_feeds = await UserFeed.filter(user_id=user_id).prefetch_related("feed").order_by("-created_at")
     logger.info(f"成功为用户ID {user_id} 检索到 {len(user_feeds)} 个订阅。")
     return user_feeds
@@ -77,7 +71,6 @@ async def get_feed(feed_id: int, user_id: int) -> Optional[Feed]:
     Returns:
         Feed对象，如果未找到或用户未订阅则返回None。
     """
-    logger.debug(f"用户 {user_id} 正在获取Feed详情, Feed ID: {feed_id}")
     try:
         # 验证用户是否订阅了此Feed
         user_feed = await UserFeed.get(user_id=user_id, feed_id=feed_id).prefetch_related("feed")
@@ -104,7 +97,6 @@ async def create_feed(feed_data: dict, user_id: int) -> Feed:
         ValueError: 如果用户已经订阅了此URL。
     """
     feed_url = str(feed_data["url"])
-    logger.info(f"用户 {user_id} 正在尝试添加订阅: {feed_url}")
 
     # 1. 查找或创建Feed
     feed, created = await Feed.get_or_create(url=feed_url)
@@ -129,7 +121,7 @@ async def create_feed(feed_data: dict, user_id: int) -> Feed:
         category=feed_data.get("category", FeedCategory.OTHER)
     )
     logger.success(f"成功为用户 {user_id} 添加订阅: {feed_url}")
-    
+
     return feed
 
 
@@ -144,49 +136,14 @@ async def delete_feed(feed_id: int, user_id: int) -> bool:
     Returns:
         如果成功删除返回True，否则返回False。
     """
-    logger.info(f"用户 {user_id} 正在请求取消订阅Feed ID: {feed_id}")
     try:
-        user_feed_subscription = await UserFeed.get(user_id=user_id, feed_id=feed_id)
-        await user_feed_subscription.delete()
+        await UserFeed.filter(user_id=user_id, feed_id=feed_id).delete()
+        await UserArticle.filter(user_id=user_id, feed_id=feed_id).delete()
         logger.success(f"成功为用户 {user_id} 取消订阅Feed ID: {feed_id}")
         return True
     except DoesNotExist:
         logger.warning(f"取消订阅失败：用户 {user_id} 未订阅Feed ID {feed_id} 或该Feed不存在。")
         return False
-
-
-async def update_feed_details(feed: Feed) -> Feed:
-    """
-    使用来自网络的最新数据更新Feed的详细信息。
-
-    Args:
-        feed: 需要更新的Feed对象。
-
-    Returns:
-        更新后的Feed对象。
-    """
-    logger.info(f"正在更新Feed详情: {feed.url} (ID: {feed.id})")
-    parsed_data = await parse_feed_from_url(feed.url)
-    if parsed_data:
-        feed.title = parsed_data.get('title', feed.title)
-        feed.description = parsed_data.get('subtitle', feed.description)
-        feed.website_url = parsed_data.get('link', feed.website_url)
-        
-        # 尝试获取图片链接
-        image_url = None
-        if 'image' in parsed_data and 'href' in parsed_data['image']:
-            image_url = parsed_data['image']['href']
-        elif 'logo' in parsed_data:
-            image_url = parsed_data['logo']
-        feed.image_url = image_url
-        
-        feed.last_fetched = datetime.utcnow()
-        await feed.save()
-        logger.success(f"成功更新Feed详情: {feed.url} (ID: {feed.id})")
-    else:
-        logger.error(f"更新Feed详情失败，无法从源获取数据: {feed.url} (ID: {feed.id})")
-        
-    return feed
 
 
 async def fetch_and_save_articles(feed: Feed, is_initial_fetch: bool = False) -> List[Article]:
@@ -264,7 +221,7 @@ async def fetch_and_save_articles(feed: Feed, is_initial_fetch: bool = False) ->
 
         return newly_created_articles
     except Exception as e:
-        print(f"获取和保存文章时出错: {str(e)}")
+        logger.info(f"获取和保存文章时出错: {str(e)}")
         return []
 
 
