@@ -46,7 +46,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "服务器异常"},
+        content={"detail": "服务器异常", "details": str(exc) if str(exc) else None,},
     )
 
 
