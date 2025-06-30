@@ -1,11 +1,31 @@
 <div align="center">
   <img src="docs/assets/logo.svg" alt="Feedboard Logo" width="150" height="150">
   <h1>Feedboard</h1>
+  <p>
+    <a href="https://www.python.org/" target="_blank">
+        <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
+    </a>
+    <a href="https://fastapi.tiangolo.com/" target="_blank">
+        <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI">
+    </a>
+    <a href="https://vuejs.org/" target="_blank">
+        <img src="https://img.shields.io/badge/Vue.js-3-4FC08D?style=flat&logo=vue.js&logoColor=white" alt="Vue.js">
+    </a>
+    <a href="https://vitejs.dev/" target="_blank">
+        <img src="https://img.shields.io/badge/Vite-646CFF?style=flat&logo=vite&logoColor=white" alt="Vite">
+    </a>
+    <a href="https://www.typescriptlang.org/" target="_blank">
+        <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white" alt="TypeScript">
+    </a>
+    <a href="https://www.docker.com/" target="_blank">
+        <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
+    </a>
+    <a href="https://www.postgresql.org/" target="_blank">
+        <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL">
+    </a>
+  </p>
   <p><strong>一款现代、高效、简洁的 RSS 订阅平台</strong></p>
   <p>
-    <a href="https://github.com/lee-lipeng/Feedboard/actions/workflows/ci.yml"><img src="https://github.com/lee-lipeng/Feedboard/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-    <a href="https://github.com/lee-lipeng/Feedboard/blob/main/LICENSE"><img src="https://img.shields.io/github/license/lee-lipeng/Feedboard?color=blue" alt="License"></a>
-    <img src="https://img.shields.io/github/stars/lee-lipeng/Feedboard?style=social" alt="GitHub Stars">
   </p>
 </div>
 
@@ -58,7 +78,7 @@ graph TD
         subgraph "后端 Worker 服务"
             W["Task Worker (Arq)"]
         end
-      
+    
         subgraph "数据库服务"
             DB["PostgreSQL"]
         end
@@ -98,8 +118,6 @@ graph TD
 | **数据库**    | PostgreSQL, sqlite                               | 成熟、可靠的关系型数据库                       |
 | **缓存/队列** | Redis                                            | 用于后台任务队列和WebSocket消息发布/订阅       |
 | **部署**      | Docker, Docker Compose, Nginx                    | 全容器化部署，Nginx作为前端静态服务和反向代理  |
-
-
 
 ## 📄 许可证
 
