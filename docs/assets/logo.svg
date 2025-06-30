@@ -1,0 +1,29 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Gradient Background -->
+    <rect width="256" height="256" rx="60" fill="url(#paint0_linear_new)"/>
+
+    <!-- Cards representing the "Board" -->
+    <!-- Bottom Card -->
+    <rect x="54" y="78" width="148" height="120" rx="12" fill="white" fill-opacity="0.4"/>
+    <!-- Middle Card -->
+    <rect x="64" y="68" width="148" height="120" rx="12" fill="white" fill-opacity="0.6"/>
+    <!-- Top Card (where the icon sits) -->
+    <rect x="74" y="58" width="148" height="120" rx="12" fill="white"/>
+
+    <!-- RSS Icon representing the "Feed" -->
+    <g>
+        <!-- The dot at the origin of the signal -->
+        <circle cx="104" cy="148" r="10" fill="#4338CA"/> 
+        <!-- The signal arcs -->
+        <path d="M104 148 A 30 30 0 0 1 134 118" stroke="#4338CA" stroke-width="16" fill="none" stroke-linecap="round"/>
+        <path d="M104 148 A 60 60 0 0 1 164 88" stroke="#4338CA" stroke-width="16" fill="none" stroke-linecap="round"/>
+    </g>
+
+    <!-- Gradient Definition -->
+    <defs>
+        <linearGradient id="paint0_linear_new" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#3B82F6"/>
+            <stop offset="1" stop-color="#4F46E5"/>
+        </linearGradient>
+    </defs>
+</svg> 
