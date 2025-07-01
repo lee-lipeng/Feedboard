@@ -1,0 +1,116 @@
+services:
+  # 1. 前端服务 (Vue + Nginx)
+  frontend:
+    build: ./frontend
+    container_name: feedboard_frontend
+    ports:
+      - "80:80"  # 主机端口:容器端口
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - feedboard_net
+    hostname: frontend
+
+  # 2. 后端 API 服务 (FastAPI)
+  api:
+    build: ./backend
+    container_name: feedboard_api
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app 
+    command: sh -c "aerich upgrade && uvicorn main:create_app --host 0.0.0.0 --port 8000 --factory"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - feedboard_net
+    hostname: api
+
+  # 3. 后台任务处理器 (Arq)
+  worker:
+    build: ./backend
+    container_name: feedboard_worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+    command: arq core.tasks.WorkerSettings
+    volumes:
+      - ./backend:/app 
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - feedboard_net
+    hostname: worker
+
+  # 4. 数据库服务 (PostgreSQL)
+  db:
+    image: postgres:16-alpine
+    container_name: feedboard_db
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=feedboard
+    ports:
+      - "5432:5432" 
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - feedboard_net
+    hostname: db
+
+  # 5. 缓存/消息队列服务 (Redis)
+  redis:
+    image: redis:8-alpine
+    container_name: feedboard_redis
+    ports:
+      - "6379:6379" 
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - feedboard_net
+    hostname: redis
+
+networks:
+  feedboard_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: feedboard_postgres_data
+  redis_data:
+    name: feedboard_redis_data

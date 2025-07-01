@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- **框架**: [Vue 3](https://vuejs.org/) (使用 Composition API 和 `<script setup>`)
+- **框架**: [Vue 3](https://vuejs.org/)
 - **构建工具**: [Vite](https://vitejs.dev/)
 - **语言**: [TypeScript](https://www.typescriptlang.org/)
 - **路由**: [Vue Router](https://router.vuejs.org/)
