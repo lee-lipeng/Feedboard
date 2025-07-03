@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 requires-python = ">=3.12"
 dependencies = [
-    "aerich==0.9.1",
+    "aerich[toml]==0.9.1",
     "arq==0.26.3",
     "asyncpg==0.30.0",
     "bcrypt==4.0.1",
@@ -26,7 +26,8 @@ dependencies = [
     "uv==0.7.16",
     "uvicorn==0.34.3",
     "watchfiles==1.1.0",
-    "websockets==15.0.1"
+    "websockets==15.0.1",
+    "granian>=2.4.1",
 ]
 
 [[tool.uv.index]]

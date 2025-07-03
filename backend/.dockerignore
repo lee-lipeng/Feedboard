@@ -1,0 +1,8 @@
+__pycache__
+*.pyc
+.idea
+.venv
+migrations
+feedboard.db
+feedboard.db-shm
+feedboard.db-wal
