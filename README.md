@@ -43,6 +43,63 @@
 - 📂 **轻松迁移**: 支持通过 OPML 文件导入和导出订阅列表，方便在不同工具间无缝切换。
 - 🔐 **安全可靠**: 基于 JWT 的安全认证体系，采用 HTTPOnly Cookie，有效保护用户数据和凭证安全。
 
+## 🚀 快速开始
+
+### 1. 环境准备
+
+- **Docker**: 确保你的系统已安装 [Docker](https://www.docker.com/get-started) 和 [Docker Compose](https://docs.docker.com/compose/install/)。
+- **Git**: 用于克隆本项目。
+
+### 2. 克隆项目
+
+```bash
+git clone https://github.com/lee-lipeng/Feedboard.git
+cd feedboard
+```
+
+### 3. 配置环境
+
+在 `backend` 目录下，创建一个 `.env` 文件。
+
+```bash
+# backend/.env
+
+DB_TYPE = postgres
+POSTGRES_SERVER = localhost
+POSTGRES_USER = postgres 
+POSTGRES_DB = feedboard
+POSTGRES_PORT = 5432
+POSTGRES_PASSWORD =
+
+REDIS_HOST = localhost
+REDIS_PORT = 6379
+REDIS_DB = 0
+REDIS_PASSWORD =
+
+SECRET_KEY=
+```
+
+### 4. 启动应用
+
+在项目根目录下，执行以下命令来构建并启动所有服务：
+
+```bash
+docker-compose up --build -d
+```
+
+### 5. 访问应用
+
+- **前端界面**: 打开浏览器并访问 `http://localhost`
+- **后端 API 文档**: 访问 `http://localhost:8000/docs`
+
+### 6. 停止应用
+
+如果你想停止所有正在运行的服务，请执行：
+
+```bash
+docker-compose down
+```
+
 ## 📸 应用截图
 
 <table>
@@ -72,13 +129,13 @@ graph TD
         end
 
         subgraph "后端 API 服务"
-            API["API Server (Uvicorn)"]
+            API["API Server (Granian)"]
         end
 
         subgraph "后端 Worker 服务"
             W["Task Worker (Arq)"]
         end
-    
+  
         subgraph "数据库服务"
             DB["PostgreSQL"]
         end
@@ -111,13 +168,13 @@ graph TD
 ## 🛠️ 技术栈
 
 
-| 类别          | 技术/库                                          | 描述                                           |
-| ------------- | ------------------------------------------------ | ---------------------------------------------- |
-| **后端**      | FastAPI, Tortoise-ORM, Arq, uv, Loguru, Pydantic | 高性能异步API、异步ORM、任务队列、包管理、日志 |
-| **前端**      | Vue 3, Vite, TypeScript, Pinia, TailwindCSS      | 现代化的前端开发全家桶                         |
-| **数据库**    | PostgreSQL, sqlite                               | 成熟、可靠的关系型数据库                       |
-| **缓存/队列** | Redis                                            | 用于后台任务队列和WebSocket消息发布/订阅       |
-| **部署**      | Docker, Docker Compose, Nginx                    | 全容器化部署，Nginx作为前端静态服务和反向代理  |
+| 类别          | 技术/库                                         | 描述                                                        |
+| ------------- | ----------------------------------------------- | ----------------------------------------------------------- |
+| **后端**      | Granian, FastAPI, Tortoise-ORM, Arq, uv, Loguru | 高性能 Web 服务器、异步API、异步ORM、任务队列、包管理、日志 |
+| **前端**      | Vue 3, Vite, TypeScript, Pinia, TailwindCSS     | 现代化的前端开发全家桶                                      |
+| **数据库**    | PostgreSQL, sqlite                              | 成熟、可靠的关系型数据库                                    |
+| **缓存/队列** | Redis                                           | 用于后台任务队列和WebSocket消息发布/订阅                    |
+| **部署**      | Docker, Docker Compose, Nginx                   | 全容器化部署，Nginx作为前端静态服务和反向代理               |
 
 ## 📄 许可证
 
