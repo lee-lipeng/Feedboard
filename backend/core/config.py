@@ -72,7 +72,7 @@ class Settings(BaseSettings):
                 password=values.data.get("POSTGRES_PASSWORD"),
                 host=values.data.get("POSTGRES_SERVER"),
                 port=values.data.get("POSTGRES_PORT"),
-                path=f"/{values.data.get('POSTGRES_DB') or ''}",
+                path=values.data.get("POSTGRES_DB") or "",
             ).unicode_string()
 
     # Redis配置

@@ -1,5 +1,5 @@
 services:
-  # 1. 前端服务 (Vue + Nginx)
+  # 前端服务 (Vue + Nginx)
   frontend:
     build: ./frontend
     container_name: feedboard_frontend
@@ -12,7 +12,7 @@ services:
       - feedboard_net
     hostname: frontend
 
-  # 2. 后端 API 服务 (FastAPI)
+  # 后端 API 服务 (FastAPI)
   api:
     build: ./backend
     container_name: feedboard_api
@@ -23,11 +23,20 @@ services:
       - REDIS_PORT=6379
       - POSTGRES_SERVER=db
       - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=feedboard
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app 
-    command: sh -c "aerich upgrade && uvicorn main:create_app --host 0.0.0.0 --port 8000 --factory"
+    command: >
+      bash -c "
+      if [ ! -d migrations ]; then
+        aerich init -t main.TORTOISE_ORM && aerich init-db;
+      else
+        aerich migrate || true && aerich upgrade || true;
+      fi &&
+      granian --interface asgi main:create_app --host 0.0.0.0 --port 8000 --factory
+      "
     depends_on:
       db:
         condition: service_healthy
@@ -38,31 +47,30 @@ services:
       - feedboard_net
     hostname: api
 
-  # 3. 后台任务处理器 (Arq)
+  # 后台任务处理器 (Arq)
   worker:
     build: ./backend
     container_name: feedboard_worker
     env_file:
       - ./backend/.env
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - POSTGRES_SERVER=db
-      - POSTGRES_PORT=5432
+        - REDIS_HOST=redis
+        - REDIS_PORT=6379
+        - POSTGRES_SERVER=db
+        - POSTGRES_PORT=5432
+        - POSTGRES_USER=postgres
+        - POSTGRES_PASSWORD=123456
+        - POSTGRES_DB=feedboard
     command: arq core.tasks.WorkerSettings
-    volumes:
-      - ./backend:/app 
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
     networks:
       - feedboard_net
     hostname: worker
 
-  # 4. 数据库服务 (PostgreSQL)
+  # 数据库服务 (PostgreSQL)
   db:
     image: postgres:16-alpine
     container_name: feedboard_db
@@ -70,7 +78,7 @@ services:
       - ./backend/.env
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=123456
       - POSTGRES_DB=feedboard
     ports:
       - "5432:5432" 
@@ -86,7 +94,7 @@ services:
       - feedboard_net
     hostname: db
 
-  # 5. 缓存/消息队列服务 (Redis)
+  # 缓存/消息队列服务 (Redis)
   redis:
     image: redis:8-alpine
     container_name: feedboard_redis
