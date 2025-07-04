@@ -3,7 +3,7 @@ import type { InternalAxiosRequestConfig } from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
   timeout: 15000, // 增加超时时间
   headers: {
     'Content-Type': 'application/json',

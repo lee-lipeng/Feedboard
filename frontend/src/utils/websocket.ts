@@ -17,9 +17,8 @@ const RECONNECT_DELAY = 5000; // 5 seconds
 
 function getWebSocketURL(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // 在开发环境中，我们假设后端服务在 8000 端口
   const host = import.meta.env.DEV
-    ? 'localhost:8000'
+    ? (import.meta.env.VITE_WS_BASE_URL || 'localhost:8000')
     : window.location.host;
   return `${protocol}//${host}/api/ws`;
 }
@@ -52,7 +51,7 @@ export function connect() {
       case 'connection_established':
         notification.success(data.message);
         break;
-      
+
       case 'feed_processed':
         notification.success(data.message);
         feedStore.fetchFeeds(); // 重新获取feed列表，以更新标题等信息
@@ -66,7 +65,7 @@ export function connect() {
           unreadStore.incrementUnreadCount(data.feed_id, data.count);
         }
         articleStore.invalidateCacheForFeed(data.feed_id); // 使该feed的文章缓存失效
-        
+
         // 检查是否需要发送通知
         const preferencesStore = usePreferencesStore();
         if (preferencesStore.preferences.notifications_enabled) {
@@ -76,11 +75,11 @@ export function connect() {
           }
           const feed = feedStore.feeds.find(f => f.feed_id === data.feed_id);
           const feedTitle = feed ? (feed.title_override || feed.feed_title) : '一个订阅源';
-          
+
           notification.info(`"${feedTitle}" 有 ${data.count} 篇新文章`);
         }
         break;
-      
+
       case 'error':
         notification.error(data.message);
         break;
@@ -95,7 +94,7 @@ export function connect() {
     console.log('WebSocket connection closed.');
     isConnected.value = false;
     socket = null;
-    
+
     // 只有在用户登录状态下才进行重连
     if (authStore.token && !reconnectTimer) {
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
@@ -127,4 +126,4 @@ export function disconnect() {
     socket.close();
     socket = null;
   }
-} 
+}
