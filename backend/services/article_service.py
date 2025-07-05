@@ -1,13 +1,11 @@
-import httpx
 import re
 from typing import List, Optional, Dict, Tuple
+
+import httpx
 from loguru import logger
-from tortoise.exceptions import DoesNotExist
 
 from tortoise.expressions import Q
-from models.article import Article, UserArticle
-from models.feed import UserFeed
-from api.ws import manager
+from models import Article, UserArticle, UserFeed
 
 
 async def get_user_articles(
@@ -85,7 +83,7 @@ async def get_user_articles(
             }
         )
 
-    logger.debug(f"为用户 {user_id} 找到 {len(result)} 篇文章（总计 {total} 篇）。")
+    logger.info(f"为用户 {user_id} 找到 {len(result)} 篇文章（总计 {total} 篇）。")
     return result, total
 
 
@@ -132,7 +130,7 @@ async def get_article_detail(article_id: int, user_id: int) -> Optional[Dict]:
     if not user_article or not user_article.is_read:
         logger.info(f"用户 {user_id} 首次查看文章 {article_id}，自动标记为已读。")
         await update_article_status(article_id, user_id, is_read=True)
-        article_dict["is_read"] = True  # 在返回值中立即体现
+        article_dict["is_read"] = True
 
     return article_dict
 
@@ -147,7 +145,6 @@ async def update_article_status(
 ) -> Optional[Dict]:
     """
     更新用户对特定文章的交互状态（如已读、收藏等）。
-    这是一个核心函数，用于处理所有用户与文章的交互。
     """
     article = await Article.get_or_none(id=article_id)
     if not article:
@@ -194,61 +191,6 @@ async def update_article_status(
     }
 
 
-async def fetch_article_content(article: Article) -> str:
-    """
-    获取文章的完整HTML内容。如果数据库中已缓存，则直接返回；否则，从源URL抓取并缓存。
-    """
-    if article.content and len(article.content) > 100:  # 假设内容过短的都是摘要
-        logger.debug(f"返回文章 {article.id} 的缓存内容。")
-        return article.content
-
-    try:
-        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
-            response = await client.get(article.url)
-            response.raise_for_status()
-
-        body_content = extract_main_body(response.text) or article.summary
-
-        if body_content:
-            article.content = body_content
-            await article.save(update_fields=['content'])
-            logger.success(f"成功抓取并缓存了文章 {article.id} 的内容。")
-            return body_content
-
-        return article.summary or "无法获取文章的有效内容。"
-    except httpx.HTTPStatusError as e:
-        logger.error(f"抓取文章 {article.id} 内容时发生HTTP错误: {e.response.status_code}")
-        return article.summary or f"获取文章内容失败: 服务器返回 {e.response.status_code}"
-    except Exception as e:
-        logger.exception(f"抓取文章 {article.id} 内容时发生未知错误: {e}")
-        return article.summary or "获取文章内容时发生未知错误。"
-
-
-def extract_main_body(html_content: str) -> Optional[str]:
-    """
-    一个简化的、基于正则表达式规则的HTML正文提取器。
-    它会尝试多个常见的文章容器标签和class/id名称。
-    """
-    # 移除脚本和样式，减少干扰
-    cleaned_html = re.sub(r'<(script|style)\b[^>]*>.*?</\1>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-
-    # 定义一系列可能的正文容器模式
-    content_patterns = [
-        r'<article\b[^>]*>(.*?)</article>',
-        r'<main\b[^>]*>(.*?)</main>',
-        r'<div\b[^>]*?(?:id|class)=["\'](?:article|content|main|post|body|entry-content)["\'][^>]*>(.*?)</div>'
-    ]
-
-    for pattern in content_patterns:
-        match = re.search(pattern, cleaned_html, re.DOTALL | re.IGNORECASE)
-        if match:
-            # 返回第一个匹配到的、最可能的内容
-            return match.group(1).strip()
-
-    # 如果以上模式都未匹配，则返回None
-    return None
-
-
 async def mark_all_articles_as_read(user_id: int, feed_id: Optional[int] = None) -> int:
     """
     将指定Feed或所有Feed的文章全部标记为已读。此操作经过优化，高效执行。
@@ -261,11 +203,6 @@ async def mark_all_articles_as_read(user_id: int, feed_id: Optional[int] = None)
     Returns:
         成功标记为已读的文章总数。
     """
-    log_message = f"用户 {user_id} 正在标记 "
-    log_message += f"Feed ID: {feed_id}" if feed_id else "所有订阅"
-    log_message += " 的文章为已读。"
-    logger.info(log_message)
-
     # 1. 确定要操作的文章ID范围
     article_query = Article.filter()
     if feed_id:
@@ -364,3 +301,58 @@ async def search_user_articles(user_id: int, query: str, skip: int = 0, limit: i
 
     logger.info(f"为用户 {user_id} 的搜索 '{query}' 找到了 {total} 篇文章，返回 {len(result)} 篇。")
     return result, total
+
+
+async def fetch_article_content(article: Article) -> str:
+    """
+    获取文章的完整HTML内容。如果数据库中已缓存，则直接返回；否则，从源URL抓取并缓存。
+    """
+    if article.content and len(article.content) > 100:  # 假设内容过短的都是摘要
+        logger.debug(f"返回文章 {article.id} 的缓存内容。")
+        return article.content
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+            response = await client.get(article.url)
+            response.raise_for_status()
+
+        body_content = extract_main_body(response.text) or article.summary
+
+        if body_content:
+            article.content = body_content
+            await article.save(update_fields=['content'])
+            logger.success(f"成功抓取并缓存了文章 {article.id} 的内容。")
+            return body_content
+
+        return article.summary or "无法获取文章的有效内容。"
+    except httpx.HTTPStatusError as e:
+        logger.error(f"抓取文章 {article.id} 内容时发生HTTP错误: {e.response.status_code}")
+        return article.summary or f"获取文章内容失败: 服务器返回 {e.response.status_code}"
+    except Exception as e:
+        logger.exception(f"抓取文章 {article.id} 内容时发生未知错误: {e}")
+        return article.summary or "获取文章内容时发生未知错误。"
+
+
+def extract_main_body(html_content: str) -> Optional[str]:
+    """
+    一个简化的、基于正则表达式规则的HTML正文提取器。
+    它会尝试多个常见的文章容器标签和class/id名称。
+    """
+    # 移除脚本和样式，减少干扰
+    cleaned_html = re.sub(r'<(script|style)\b[^>]*>.*?</\1>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+
+    # 定义一系列可能的正文容器模式
+    content_patterns = [
+        r'<article\b[^>]*>(.*?)</article>',
+        r'<main\b[^>]*>(.*?)</main>',
+        r'<div\b[^>]*?(?:id|class)=["\'](?:article|content|main|post|body|entry-content)["\'][^>]*>(.*?)</div>'
+    ]
+
+    for pattern in content_patterns:
+        match = re.search(pattern, cleaned_html, re.DOTALL | re.IGNORECASE)
+        if match:
+            # 返回第一个匹配到的、最可能的内容
+            return match.group(1).strip()
+
+    # 如果以上模式都未匹配，则返回None
+    return None

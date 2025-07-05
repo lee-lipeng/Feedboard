@@ -44,7 +44,6 @@ def get_password_hash(password: str) -> str:
 async def get_current_user_from_token(token: str) -> Optional[User]:
     """
     从JWT令牌中解析并获取用户，认证失败时返回None。
-    此函数专为WebSocket等不适合直接抛出HTTPException的场景设计。
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])

@@ -1,12 +1,11 @@
-import xml.etree.ElementTree as ET
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Request
-from fastapi.responses import Response
-from arq.connections import ArqRedis
 from collections import defaultdict
+
+import xml.etree.ElementTree as ET
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Request, Response
+from arq.connections import ArqRedis
 from loguru import logger
 
-from models.user import User
-from models.feed import UserFeed
+from models import User, UserFeed
 from core.security import get_current_user
 
 router = APIRouter()
@@ -47,7 +46,7 @@ async def export_opml_data(current_user: User = Depends(get_current_user)):
         "Content-Type": "application/xml; charset=utf-8"
     }
 
-    logger.info(f"已成功为用户生成OPML文件 {current_user.email} ，共有 {len(user_feeds)} 订阅源.")
+    logger.success(f"用户 [{current_user.email}] 导出了OPML文件.")
     return Response(content=opml_string, headers=headers)
 
 
@@ -108,13 +107,13 @@ async def import_opml_data(
         return {"message": f"成功找到 {len(subscriptions_to_add)} 个订阅源，已开始在后台导入。"}
 
     except (ET.ParseError, ValueError) as e:
-        logger.warning(f"无法解析OPML文件 {current_user.email}. 错误: {e}")
+        logger.error(f"无法解析OPML文件 {current_user.email}. 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"文件解析失败: {e}"
         )
     except Exception as e:
-        logger.exception(f"用户的OPML导入过程中发生意外错误 {current_user.email}")
+        logger.exception(f"用户 [{current_user.email}] 的OPML导入过程中发生意外错误, 错误: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="导入过程中发生未知错误。"

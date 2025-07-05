@@ -36,16 +36,16 @@ class UserArticle(models.Model):
     id = fields.IntField(pk=True)
     user = fields.ForeignKeyField("models.User", related_name="article_interactions", on_delete=fields.CASCADE, description="关联的用户")
     article = fields.ForeignKeyField("models.Article", related_name="user_interactions", on_delete=fields.CASCADE, description="关联的文章")
-    
+
     # 交互状态字段
     is_read = fields.BooleanField(default=False, index=True, description="是否已读")
     is_favorite = fields.BooleanField(default=False, index=True, description="是否收藏")
     read_later = fields.BooleanField(default=False, index=True, description="是否标记为稍后读")
     read_position = fields.IntField(default=0, description="阅读位置（例如滚动条百分比），用于继续阅读")
-    
+
     created_at = fields.DatetimeField(auto_now_add=True, description="记录创建时间")
     updated_at = fields.DatetimeField(auto_now=True, description="记录更新时间")
-    
+
     class Meta:
         table = "user_articles"
         unique_together = (("user", "article"),)  # 确保一个用户对一篇文章只有一条交互记录
@@ -53,12 +53,3 @@ class UserArticle(models.Model):
 
     def __str__(self):
         return f"用户 {self.user_id} 对文章 {self.article_id} 的交互"
-
-
-# 创建Pydantic模型
-Article_Pydantic = pydantic_model_creator(
-    Article, name="Article"
-)
-ArticleCreate_Pydantic = pydantic_model_creator(
-    Article, name="ArticleCreate", exclude=("id", "created_at", "updated_at")
-)

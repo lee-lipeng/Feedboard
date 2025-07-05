@@ -1,13 +1,12 @@
 from typing import Any, List, Optional
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, HttpUrl
 from arq.connections import ArqRedis
 from loguru import logger
-from datetime import datetime
 
-from models.user import User
-from models.feed import FeedCategory
+from models import User, FeedCategory
 from core.security import get_current_user
 from services.feed_service import (
     get_user_feeds,
@@ -109,7 +108,7 @@ async def add_feed_subscription(
         # 将耗时的抓取和解析操作放入arq任务队列
         arq_pool: ArqRedis = request.app.state.arq_pool
         await arq_pool.enqueue_job("process_new_feed_task", feed_id=feed.id, user_id=current_user.id)
-        logger.info(f"已为Feed ID {feed.id} 创建后台解析任务。")
+        logger.success(f"用户 {current_user.id} 已成功添加订阅源 (ID: {feed.id}) 的后台处理任务。")
 
         # 立即返回一个临时响应
         return FeedResponse(
@@ -125,7 +124,6 @@ async def add_feed_subscription(
             feed_updated_at=feed.updated_at
         )
     except ValueError as e:
-        # 捕获由服务层抛出的特定错误，例如"已经订阅"
         logger.warning(f"用户 {current_user.id} 添加订阅失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,7 +147,7 @@ async def read_feed(
             detail="您未订阅此Feed，或该Feed不存在。"
         )
 
-    logger.success(f"成功返回Feed (ID: {feed_id}) 的详情给用户 {current_user.id}。")
+    logger.success(f"成功为用户 {current_user.id} 返回订阅源 (ID: {feed_id}) 的详细信息。")
     return FeedResponse.model_validate(feed)
 
 
@@ -169,7 +167,7 @@ async def remove_feed(
             detail="取消订阅失败：您未订阅此Feed。"
         )
     logger.success(f"用户 {current_user.id} 已成功取消订阅Feed ID {feed_id}。")
-    return {"status": "success", "message": "已成功取消订阅"}
+    return {"message": "已成功取消订阅"}
 
 
 @router.post("/refresh-all", status_code=status.HTTP_202_ACCEPTED)
@@ -178,12 +176,12 @@ async def refresh_all_feeds_for_current_user(
         current_user: User = Depends(get_current_user)
 ) -> Any:
     """
-    为当前用户触发所有订阅源的后台刷新任务。
+    为当前用户触发其所有订阅源的后台刷新任务。
     这是一个异步操作，会立即返回。
     """
-    logger.info(f"用户 {current_user.id} 触发了所有订阅源的后台刷新。")
     arq_pool: ArqRedis = request.app.state.arq_pool
     await arq_pool.enqueue_job("refresh_all_feeds_for_user", user_id=current_user.id)
+    logger.success(f"已为用户 {current_user.id} 创建后台刷新所有订阅源任务。")
     return {"message": "已成功触发所有订阅源的后台刷新任务"}
 
 
@@ -201,12 +199,12 @@ async def refresh_feed(
         logger.warning(f"用户 {current_user.id} 尝试刷新一个不存在或未订阅的Feed (ID: {feed_id})。")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="您未订阅此Feed，或该Feed不存在。"
+            detail="你未订阅此Feed，或该Feed不存在。"
         )
 
     # 将刷新任务放入arq队列
     arq_pool: ArqRedis = request.app.state.arq_pool
-    await arq_pool.enqueue_job("process_new_feed_task", feed_id=feed.id, user_id=current_user.id)
+    await arq_pool.enqueue_job("refresh_feed", feed=feed)
 
     logger.success(f"已为Feed (ID: {feed.id}) 创建后台刷新任务。")
     return {"message": f"已触发 '{feed.title}' 的后台刷新"}

@@ -57,12 +57,3 @@ class UserFeed(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.feed.title}"
-
-
-# 创建Pydantic模型
-Feed_Pydantic = pydantic_model_creator(
-    Feed, name="Feed"
-)
-FeedCreate_Pydantic = pydantic_model_creator(
-    Feed, name="FeedCreate", exclude=("id", "created_at", "updated_at", "last_fetched")
-)

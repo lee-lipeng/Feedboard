@@ -38,14 +38,14 @@ async def get_user_preferences(current_user: User = Depends(get_current_user)) -
     """
     获取当前登录用户的偏好设置。
     """
-    logger.debug(f"获取用户偏好 {current_user.email}")
+    logger.info(f"用户 [{current_user.email}] 获取偏好设置")
     return UserPreferences.model_validate(current_user)
 
 
 @router.put("", response_model=UserPreferences, summary="更新用户偏好设置")
 async def update_user_preferences(
-    preferences: UserPreferences,
-    current_user: User = Depends(get_current_user)
+        preferences: UserPreferences,
+        current_user: User = Depends(get_current_user)
 ) -> UserPreferences:
     """
     更新当前用户的偏好设置。
@@ -53,13 +53,15 @@ async def update_user_preferences(
     """
     update_data = preferences.model_dump(exclude_unset=True)
     if not update_data:
-        logger.warning(f"没有提供任何需要更新的偏好设置 {current_user.email}")
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="没有提供任何需要更新的偏好设置")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="没有提供任何需要更新的偏好设置"
+        )
 
     for key, value in update_data.items():
         setattr(current_user, key, value)
 
     await current_user.save()
-    logger.info(f"用户的偏好设置已成功更新 {current_user.email} 数据: {update_data}")
+    logger.success(f"用户 [{current_user.email}] 更新偏好设置成功")
 
     return UserPreferences.model_validate(current_user)

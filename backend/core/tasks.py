@@ -1,11 +1,13 @@
-import tortoise
 from typing import Dict, Any
 from datetime import datetime
+
+from tortoise import Tortoise
 from arq.connections import RedisSettings
 from arq import cron
 from loguru import logger
 
 from core.config import settings
+from db.init_db import TORTOISE_ORM
 from models.feed import Feed
 from services.feed_service import parse_feed_from_url, fetch_and_save_articles, get_user_feeds, create_feed
 from api.ws import manager
@@ -18,10 +20,7 @@ async def setup_db(ctx):
     # ctx是arq传递的上下文，可以用来存储连接
     if not ctx.get('tortoise_initialized'):
         logger.info("初始化数据库连接...")
-        await tortoise.Tortoise.init(
-            db_url=settings.DATABASE_URI,
-            modules={"models": settings.DB_MODELS}
-        )
+        await Tortoise.init(config=TORTOISE_ORM)
         ctx['tortoise_initialized'] = True
 
 
@@ -31,15 +30,31 @@ async def cleanup_db(ctx):
     """
     if ctx.get('tortoise_initialized'):
         logger.info("关闭数据库连接...")
-        await tortoise.Tortoise.close_connections()
+        await Tortoise.close_connections()
         ctx['tortoise_initialized'] = False
+
+
+async def startup(ctx: Dict[str, Any]):
+    """
+    Worker 启动时执行
+    """
+    ctx['tortoise_initialized'] = False
+    await setup_db(ctx)
+    logger.info("ARQ Worker 启动...")
+
+
+async def shutdown(ctx: Dict[str, Any]):
+    """
+    Worker 关闭时执行
+    """
+    await cleanup_db(ctx)
+    logger.info("ARQ Worker 关闭...")
 
 
 async def process_new_feed_task(ctx: Dict[str, Any], feed_id: int, user_id: int):
     """
     后台任务：解析Feed信息，抓取文章，并通知用户。
     """
-    await setup_db(ctx)
     feed = await Feed.get_or_none(id=feed_id)
     if not feed:
         return
@@ -72,6 +87,7 @@ async def process_new_feed_task(ctx: Dict[str, Any], feed_id: int, user_id: int)
         )
 
     except Exception as e:
+        logger.exception(f"处理订阅源 '{feed.url}' 时出错: {e}")
         # 异常处理：通知用户失败
         await manager.send_personal_message(
             {
@@ -85,7 +101,6 @@ async def refresh_all_feeds_task(ctx: Dict[str, Any]):
     """
     定时任务：更新所有订阅源的文章
     """
-    await setup_db(ctx)
     logger.info(f"[{datetime.now()}] 开始执行定时任务：刷新所有Feed...")
     feeds = await Feed.all()
 
@@ -93,43 +108,37 @@ async def refresh_all_feeds_task(ctx: Dict[str, Any]):
         try:
             await fetch_and_save_articles(feed)
         except Exception as e:
-            logger.error(f"刷新 Feed '{feed.title}' ({feed.id}) 时出错: {e}")
+            logger.exception(f"更新订阅源 [{feed.title}-{feed.url}] 时出错: {e}")
 
-    logger.info(f"[{datetime.now()}] 定时任务执行完毕。")
+    logger.info(f"[{datetime.now()}] 定时任务执行完毕：刷新所有Feed")
 
 
-async def refresh_single_feed_task(ctx: Dict[str, Any], feed_id: int):
+async def refresh_feed(ctx: Dict[str, Any], feed: Feed):
     """
     后台任务：刷新单个订阅源
     """
-    await setup_db(ctx)
-    if feed := await Feed.get_or_none(id=feed_id):
-        try:
-            logger.info(f"开始刷新 Feed '{feed.title}' ({feed.id})...")
-            await fetch_and_save_articles(feed)
-        except Exception as e:
-            logger.error(f"刷新 Feed '{feed.title}' ({feed.id})失败: {e}")
+    try:
+        await fetch_and_save_articles(feed)
+    except Exception as e:
+        logger.exception(f"更新订阅源 [{feed.title}-{feed.url}] 时出错: {e}")
 
 
 async def refresh_all_feeds_for_user(ctx: Dict[str, Any], user_id: int):
     """
-    为指定用户刷新其所有订阅源，通过为每个源创建独立的后台任务
+    后台任务：为指定用户刷新其所有订阅源
     """
-    await setup_db(ctx)
-    arq_pool = ctx['redis']
     user_feeds = await get_user_feeds(user_id)
-    count = 0
     for user_feed in user_feeds:
-        await arq_pool.enqueue_job("refresh_single_feed_task", feed_id=user_feed.feed.id)
-        count += 1
-
+        try:
+            await fetch_and_save_articles(user_feed.feed)
+        except Exception as e:
+            logger.exception(f"更新订阅源 [{user_feed.feed.title}-{user_feed.feed.url}] 时出错: {e}")
 
 
 async def import_feeds_for_user_task(ctx: Dict[str, Any], user_id: int, subscriptions: list):
     """
     后台任务：为用户批量导入订阅源
     """
-    await setup_db(ctx)
     arq_pool = ctx['redis']
 
     success_count = 0
@@ -145,7 +154,7 @@ async def import_feeds_for_user_task(ctx: Dict[str, Any], user_id: int, subscrip
         except ValueError:  # 忽略已存在的订阅
             success_count += 1
         except Exception as e:
-            print(f"导入订阅源 {sub['url']} 时失败: {e}")
+            logger.exception(f"导入订阅源 {sub['url']} 时失败: {e}")
             failure_count += 1
 
     # 任务完成后通知用户
@@ -155,22 +164,6 @@ async def import_feeds_for_user_task(ctx: Dict[str, Any], user_id: int, subscrip
             "message": f"订阅导入完成！成功: {success_count}, 失败: {failure_count}。",
         }, user_id
     )
-
-
-async def startup(ctx: Dict[str, Any]):
-    """
-    Worker 启动时执行
-    """
-    ctx['tortoise_initialized'] = False
-    logger.info("ARQ Worker 启动...")
-
-
-async def shutdown(ctx: Dict[str, Any]):
-    """
-    Worker 关闭时执行
-    """
-    await cleanup_db(ctx)
-    logger.info("ARQ Worker 关闭...")
 
 
 class WorkerSettings:
@@ -186,8 +179,8 @@ class WorkerSettings:
     functions = [
         process_new_feed_task,
         refresh_all_feeds_task,
+        refresh_feed,
         refresh_all_feeds_for_user,
-        refresh_single_feed_task,
         import_feeds_for_user_task
     ]
     on_startup = startup

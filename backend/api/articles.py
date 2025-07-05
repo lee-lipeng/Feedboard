@@ -71,8 +71,6 @@ async def list_articles(
     获取当前用户的文章列表，支持丰富的过滤、排序和分页功能。
     所有业务逻辑已移至服务层。
     """
-    logger.info(f"用户 {current_user.id} 正在获取文章列表，参数: feed_id={feed_id}, is_read={is_read}, sort_by={sort_by}")
-
     articles, total = await get_user_articles(
         user_id=current_user.id,
         skip=skip,
@@ -86,6 +84,8 @@ async def list_articles(
 
     total_pages = math.ceil(total / limit) if limit > 0 else 0
     page = (skip // limit) + 1 if limit > 0 else 1
+
+    logger.success(f"用户 {current_user.id} 请求文章列表，找到 {total} 篇文章。")
 
     return {
         "data": articles,
@@ -107,13 +107,14 @@ async def search_articles(
     根据关键词在当前用户订阅的所有文章中进行全文搜索。
     """
     if not q.strip():
+        logger.warning(f"用户 {current_user.id} 搜索关键词为空，请求被拒绝。")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="搜索关键词不能为空")
 
     articles, total = await search_user_articles(user_id=current_user.id, query=q, skip=skip, limit=limit)
     total_pages = math.ceil(total / limit) if limit > 0 else 0
     page = (skip // limit) + 1 if limit > 0 else 1
 
-    logger.success(f"为用户 {current_user.id} 的搜索 '{q}' 找到 {total} 篇文章。")
+    logger.success(f"用户 {current_user.id} 搜索关键词 '{q}' 找到 {total} 篇文章。")
     return {
         "data": articles,
         "total": total,
@@ -135,9 +136,9 @@ async def read_article(
     article = await get_article_detail(article_id=article_id, user_id=current_user.id)
     if not article:
         logger.warning(f"用户 {current_user.id} 请求的文章 (ID: {article_id}) 未找到或无权访问。")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在或您没有权限查看")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在或没有权限查看")
 
-    logger.success(f"成功返回文章 (ID: {article_id}) 的详情给用户 {current_user.id}")
+    logger.success(f"用户 {current_user.id} 请求文章 (ID: {article_id}) 详情。")
     return article
 
 
@@ -163,7 +164,7 @@ async def update_article_status_endpoint(
         logger.warning(f"用户 {current_user.id} 更新文章状态失败 (ID: {article_id})，文章可能不存在或无权访问。")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文章不存在或更新失败")
 
-    logger.success(f"成功为用户 {current_user.id} 更新了文章 (ID: {article_id}) 的状态:{status_update}。")
+    logger.success(f"用户 {current_user.id} 更新文章状态成功 (ID: {article_id})。")
     return result
 
 

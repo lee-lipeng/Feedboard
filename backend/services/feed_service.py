@@ -1,13 +1,13 @@
-import feedparser
-import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+
+import feedparser
+import httpx
 from loguru import logger
 from tortoise.exceptions import DoesNotExist
 from tortoise.transactions import in_transaction
 
-from models.feed import Feed, UserFeed, FeedCategory
-from models.article import Article, UserArticle
+from models import Feed, UserFeed, FeedCategory, Article, UserArticle
 
 
 async def parse_feed_from_url(url: str) -> Optional[dict]:
@@ -121,7 +121,7 @@ async def create_feed(feed_data: dict, user_id: int) -> Feed:
         title_override=feed_data.get("title"),
         category=feed_data.get("category", FeedCategory.OTHER)
     )
-    logger.success(f"成功为用户 {user_id} 添加订阅: {feed_url}")
+    logger.success(f"用户 [{user_id}] 成功订阅Feed: {feed_url}")
 
     return feed
 
@@ -161,10 +161,6 @@ async def fetch_and_save_articles(feed: Feed, is_initial_fetch: bool = False) ->
         # 1. 首先获取所有订阅了此Feed的用户ID
         subscriber_ids = await UserFeed.filter(feed_id=feed.id).values_list('user_id', flat=True)
 
-        # 如果没有订阅者，则不执行任何操作
-        if not subscriber_ids:
-            return []
-
         # 2. 抓取Feed内容
         async with httpx.AsyncClient() as client:
             response = await client.get(feed.url, follow_redirects=True)
@@ -175,16 +171,16 @@ async def fetch_and_save_articles(feed: Feed, is_initial_fetch: bool = False) ->
         # 3. 筛选并创建新文章
         newly_created_articles = []
         for entry in feed_data.entries:
-            # 检查文章是否已存在
             guid = entry.get("id", entry.get("link"))
             if not guid:
                 continue
 
             existing_article = await Article.get_or_none(guid=guid, feed_id=feed.id)
+            # 如果文章已存在，跳过
             if existing_article:
                 continue
 
-            published_at = datetime(*entry.published_parsed[:6]) if "published_parsed" in entry else datetime.utcnow()
+            published_at = datetime(*entry.published_parsed[:6]) if "published_parsed" in entry else datetime.now()
 
             article = await Article.create(
                 title=entry.get("title", "无标题"),
@@ -199,35 +195,35 @@ async def fetch_and_save_articles(feed: Feed, is_initial_fetch: bool = False) ->
             )
             newly_created_articles.append(article)
 
-        # 4. 如果有新文章，为所有订阅者批量创建关联记录
-        if newly_created_articles:
+        # 4. 如果有新文章且订阅者列表不为空，为所有订阅者批量创建关联记录
+        if newly_created_articles and subscriber_ids:
             user_article_links = [
                 UserArticle(user_id=user_id, article_id=article.id)
                 for article in newly_created_articles
                 for user_id in subscriber_ids
             ]
             await UserArticle.bulk_create(user_article_links)
+            feed_title = feed.title or "未命名订阅源"
 
-            # 仅在非首次抓取时发送通知，首次抓取的通知在 process_new_feed_background 中处理
+            # 5. 向订阅者发送新文章通知
             if not is_initial_fetch:
-                feed_title = feed.title or "一个订阅源"
                 for user_id in subscriber_ids:
                     await manager.send_personal_message(
                         {
                             "type": "new_articles",
-                            "message": f"'{feed_title}' 有 {len(newly_created_articles)} 篇新文章",
+                            "message": f"你订阅的 [{feed_title}-{feed.url}] 有{len(newly_created_articles)}篇新文章发布！",
                             "feed_id": feed.id,
                             "count": len(newly_created_articles)
                         }, user_id
                     )
 
-        # 5. 更新Feed的最后获取时间
-        feed.last_fetched = datetime.utcnow()
+        # 6. 更新Feed的最后获取时间
+        feed.last_fetched = datetime.now()
         await feed.save()
 
         return newly_created_articles
     except Exception as e:
-        logger.info(f"获取和保存文章时出错: {str(e)}")
+        logger.exception(f"抓取Feed {feed.url} 失败: {e}")
         return []
 
 

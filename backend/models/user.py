@@ -36,6 +36,3 @@ class User(models.Model):
 User_Pydantic = pydantic_model_creator(
     User, name="User", exclude=("hashed_password",)
 )
-UserCreate_Pydantic = pydantic_model_creator(
-    User, name="UserCreate", exclude_readonly=True
-)

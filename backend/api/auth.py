@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -41,7 +42,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(subject=user.id, expires_delta=access_token_expires)
 
-    logger.info(f"用户 {user.email} 登录成功.")
+    logger.success(f"用户 [{user.email}] 登录成功.")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -60,6 +61,6 @@ async def register_user(user_in: UserRegister) -> User_Pydantic:
         )
 
     user = await create_user(email=user_in.email, password=user_in.password)
-    logger.info(f"用户 {user.email} 已成功注册ID: {user.id}.")
+    logger.success(f"用户 [{user.email}] 注册成功.")
 
     return await User_Pydantic.from_tortoise_orm(user)

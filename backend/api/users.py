@@ -21,7 +21,7 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)) 
     """
     获取当前登录用户的详细信息。
     """
-    logger.debug(f"正在获取用户的个人资料: {current_user.email}")
+    logger.info(f"用户 [{current_user.email}] 获取个人资料")
     return await User_Pydantic.from_tortoise_orm(current_user)
 
 
@@ -45,25 +45,22 @@ async def update_current_user_info(
         existing_user = await User.filter(email=user_in.email).first()
         if existing_user:
             logger.warning(
-                f"用户 {current_user.email} 未能将电子邮件更新到 {user_in.email}, "
-                "因为已被其他账户使用."
+                f"用户 [{current_user.email}] 更新邮箱失败，邮箱 {user_in.email} 已被其他账户使用"
             )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="该邮箱地址已被其他账户使用"
             )
         current_user.email = user_in.email
-        logger.info(f"用户电子邮件已更新至 {user_in.email}")
+        logger.success(f"用户 [{current_user.email}] 电子邮件已更新至 {user_in.email}")
 
     # 更新密码
     if user_in.password:
         hashed_password = get_password_hash(user_in.password)
         current_user.hashed_password = hashed_password
-        logger.info(f"用户密码已更新.")
+        logger.success(f"用户 [{current_user.email}] 密码已更新.")
 
     await current_user.save()
-    logger.info(f"用户个人资料 {current_user.email} 已成功更新.")
-
     return await User_Pydantic.from_tortoise_orm(current_user)
 
 
@@ -75,5 +72,5 @@ async def delete_current_user(current_user: User = Depends(get_current_user)):
     使用物理删除清除与用户相关的一切数据，包括用户的订阅，文章，偏好设置等。
     """
     await current_user.delete()
-    logger.info(f"用户 {current_user.email} 已成功注销.")
+    logger.success(f"用户 [{current_user.email}] 已成功注销.")
     return {"message": "用户已成功注销"}

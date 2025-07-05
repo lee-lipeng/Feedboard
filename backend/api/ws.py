@@ -1,10 +1,9 @@
 import uuid
 from typing import Dict, Any
-from fastapi import WebSocket, WebSocketDisconnect, APIRouter, Depends
+from fastapi import WebSocket, WebSocketDisconnect, APIRouter
 from loguru import logger
 
 from core.security import get_current_user_from_token
-from models.user import User
 
 router = APIRouter()
 
@@ -25,7 +24,7 @@ class ConnectionManager:
         if user_id not in self.active_connections:
             self.active_connections[user_id] = {}
         self.active_connections[user_id][conn_id] = websocket
-        logger.info(f"WebSocket connected: user_id={user_id}, conn_id={conn_id}")
+        logger.info(f"用户 [{user_id}-{conn_id}] 已连接到WebSocket.")
 
     def disconnect(self, user_id: int, conn_id: str):
         """移除一个已断开的WebSocket连接。"""
@@ -33,20 +32,20 @@ class ConnectionManager:
             del self.active_connections[user_id][conn_id]
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
-            logger.info(f"WebSocket disconnected: user_id={user_id}, conn_id={conn_id}")
+            logger.info(f"用户 [{user_id}-{conn_id}] 已断开WebSocket连接.")
 
     async def send_personal_message(self, message: Dict[str, Any], user_id: int):
         """向特定用户的所有活动连接发送JSON消息。"""
         if user_id in self.active_connections:
             # 创建副本以安全地迭代，因为disconnect会修改字典
             connections_to_notify = list(self.active_connections[user_id].items())
-            logger.debug(f"Sending message to user {user_id} across {len(connections_to_notify)} connections. Message type: {message.get('type')}")
+            logger.info(f"向用户 [{user_id}] 发送WebSocket消息: {message}")
 
             for conn_id, connection in connections_to_notify:
                 try:
                     await connection.send_json(message)
                 except (WebSocketDisconnect, RuntimeError):
-                    logger.warning(f"Failed to send message to user {user_id}, conn_id {conn_id}. Connection seems closed.")
+                    logger.warning(f"WebSocket连接 [{user_id}-{conn_id}] 已断开，消息已丢弃.")
                     self.disconnect(user_id, conn_id)
 
 
@@ -56,7 +55,7 @@ manager = ConnectionManager()
 @router.websocket("")
 async def websocket_endpoint(websocket: WebSocket, token: str):
     """
-    WebSocket主端点。
+    WebSocket连接处理函数。
     处理连接认证、生命周期管理和消息收发。
     """
     conn_id = str(uuid.uuid4())
@@ -67,7 +66,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
             user = await get_current_user_from_token(token)
             if not user:
                 logger.warning("WebSocket连接失败，无效令牌.")
-                # 不调用 accept()，连接会自动被拒绝
                 return
 
             await manager.connect(websocket, user.id, conn_id)
@@ -89,7 +87,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                     await websocket.send_json({"type": "pong"})
 
         except WebSocketDisconnect:
-            logger.info("WebSocket client disconnected.")
+            logger.info("WebSocket连接已断开.")
         except Exception as e:
             logger.exception(f"WebSocket中发生意外错误: {e}")
             # 尝试向客户端发送错误信息
