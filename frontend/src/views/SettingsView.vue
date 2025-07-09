@@ -186,22 +186,6 @@
         </div>
       </div>
 
-      <!-- 确认对话框 - 清除历史记录 -->
-      <div v-if="showClearHistoryConfirm" class="confirm-dialog-backdrop">
-        <div class="confirm-dialog">
-          <div class="confirm-header">
-            <h3>确认清除历史记录</h3>
-          </div>
-          <div class="confirm-body">
-            <p>您确定要清除所有已读文章的历史记录吗？此操作无法撤销。</p>
-          </div>
-          <div class="confirm-actions">
-            <button class="cancel-btn" @click="showClearHistoryConfirm = false">取消</button>
-            <button class="confirm-btn danger" @click="clearHistory">确认清除</button>
-          </div>
-        </div>
-      </div>
-
       <!-- 确认对话框 - 删除账户 -->
       <div v-if="showDeleteAccountConfirm" class="confirm-dialog-backdrop">
         <div class="confirm-dialog">
@@ -301,7 +285,6 @@ const save = () => {
 
 
 // 确认对话框状态
-const showClearHistoryConfirm = ref(false);
 const showDeleteAccountConfirm = ref(false);
 const deleteConfirmEmail = ref('');
 const isExporting = ref(false);
@@ -359,7 +342,7 @@ const exportData = async () => {
         filename = filenameMatch[1];
       }
     }
-    
+
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
@@ -373,17 +356,6 @@ const exportData = async () => {
   }
 };
 
-// 清除历史记录
-const clearHistory = async () => {
-  try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    showClearHistoryConfirm.value = false;
-    alert('历史记录已清除');
-  } catch (error) {
-    alert('操作失败，请稍后重试');
-  }
-};
 
 // 删除账户
 const deleteAccount = async () => {
@@ -392,13 +364,13 @@ const deleteAccount = async () => {
   }
 
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // 调用删除账户
+    await authStore.deleteAccount();
+    notification.success('账号删除成功');
     showDeleteAccountConfirm.value = false;
     await authStore.logout();
-    router.push({ name: 'login' });
-  } catch (error) {
-    alert('操作失败，请稍后重试');
+  } catch (error: any) {
+    notification.error(error.response?.data?.detail || '账号删除失败，请稍后重试');
   }
 };
 
