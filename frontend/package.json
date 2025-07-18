@@ -8,6 +8,7 @@
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
+    "tauri": "tauri",
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
@@ -20,6 +21,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.10",
+    "@tauri-apps/api": "^2.6.0",
+    "@tauri-apps/cli": "^2.6.2",
     "@tsconfig/node22": "^22.0.1",
     "@types/dompurify": "^3.0.7",
     "@types/lodash.debounce": "^4.0.9",
